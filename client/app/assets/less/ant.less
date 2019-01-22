@@ -17,6 +17,7 @@
 @import '~antd/lib/table/style/index.less';
 @import '~antd/lib/popover/style/index.less';
 @import '~antd/lib/tag/style/index.less';
+@import '~antd/lib/collapse/style/index.less';
 @import 'inc/ant-variables';
 
 // Remove bold in labels for Ant checkboxes and radio buttons
@@ -137,5 +138,20 @@
         color: @pagination-color;
       }
     }
+  }
+}
+
+.ant-collapse {
+  &-content-box:empty {
+    display: none;
+  }
+
+  &-header {
+    padding-left: 0 !important;
+  }
+
+  &-header .ant-radio-wrapper,
+  &-item-active .ant-collapse-header {
+    pointer-events: none;
   }
 }

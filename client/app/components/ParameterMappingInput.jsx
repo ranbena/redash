@@ -11,10 +11,9 @@ import Popover from 'antd/lib/popover';
 import Input from 'antd/lib/input';
 import Radio from 'antd/lib/radio';
 import Tooltip from 'antd/lib/tooltip';
+import Collapse from 'antd/lib/collapse';
 import { ParameterValueInput } from '@/components/ParameterValueInput';
 import { ParameterMappingType } from '@/services/widget';
-
-import './ParameterMappingInput.css';
 
 export const MappingType = {
   DashboardAddNew: 'dashboard-add-new',
@@ -24,8 +23,8 @@ export const MappingType = {
 };
 
 const MappingTypeLabel = {
-  [MappingType.DashboardAddNew]: 'Dashboard parameter',
-  [MappingType.DashboardMapToExisting]: 'Dashboard parameter',
+  [MappingType.DashboardAddNew]: 'New dashboard parameter',
+  [MappingType.DashboardMapToExisting]: 'Existing dashboard parameter',
   [MappingType.WidgetLevel]: 'Widget parameter',
   [MappingType.StaticValue]: 'Static value',
 };
@@ -87,6 +86,22 @@ export function editableMappingsToParameterMappings(mappings) {
   ));
 }
 
+function RadioPanel({ header, isActive, ...props }) {
+  const radio = (
+    <Radio checked={isActive}>{header}</Radio>
+  );
+
+  return (
+    <Collapse.Panel
+      style={{ border: 0, marginBottom: -10 }}
+      showArrow={false}
+      header={radio}
+      isActive={isActive}
+      {...props}
+    />
+  );
+}
+
 class SourceInput extends React.Component {
   static propTypes = {
     mapping: PropTypes.object.isRequired, // eslint-disable-line react/forbid-prop-types
@@ -122,8 +137,7 @@ class SourceInput extends React.Component {
     this.mapping = { mapTo: e.target.value };
   }
 
-  onChangeSourceType = (e) => {
-    const type = e.target.value;
+  onChangeSourceType = (type) => {
     let mapTo = this.state.originalMapTo;
     if (type === MappingType.DashboardMapToExisting) {
       const { existingParamNames } = this.props;
@@ -144,14 +158,6 @@ class SourceInput extends React.Component {
   }
 
   get popover() {
-    const radioStyle = {
-      style: {
-        display: 'block',
-        height: '30px',
-        lineHeight: '30px',
-      },
-    };
-
     const { existingParamNames: existing } = this.props;
     const {
       type, mapTo, value, param,
@@ -169,39 +175,22 @@ class SourceInput extends React.Component {
     }
 
     return (
-      <Fragment>
-        <Radio.Group onChange={this.onChangeSourceType} value={type}>
-          <Radio {...radioStyle} value={MappingType.DashboardAddNew} key={0}>
-            New dashboard parameter
-            <span style={{
-              opacity: type === MappingType.DashboardAddNew ? 1 : 0,
-              pointerEvents: type === MappingType.DashboardAddNew ? null : 'none',
-            }}
-            >
-              <Input
-                size="small"
-                value={mapTo}
-                onChange={this.onChangeAddNewName}
-                style={{
-                 width: 80, marginLeft: 3, marginRight: 2, borderColor: fulfilled ? '#e8e8e8' : '#F44336',
-                }}
-              />
-              {alreadyExists ?
-                <Tooltip title={`A dashboard parameter named "${mapTo}" already exists.`}>
-                  <Icon type="exclamation-circle" style={{ color: '#F44336' }} />
-                </Tooltip>
-                : null
-              }
-              {isEmpty(mapTo) ?
-                <Tooltip title="Can't be left empty">
-                  <Icon type="exclamation-circle" style={{ color: '#F44336' }} />
-                </Tooltip>
-                : null
-              }
-            </span>
-          </Radio>
-          <Radio {...radioStyle} value={MappingType.DashboardMapToExisting} key={1}>
-            Existing dashboard parameter {' '}
+      <div style={{ width: 300, height: 233, position: 'relative' }}>
+        <Collapse bordered={false} accordion onChange={this.onChangeSourceType} defaultActiveKey={type}>
+          <RadioPanel
+            header={MappingTypeLabel[MappingType.DashboardAddNew]}
+            key={MappingType.DashboardAddNew}
+          >
+            <Input
+              size="small"
+              value={mapTo}
+              onChange={this.onChangeAddNewName}
+            />
+          </RadioPanel>
+          <RadioPanel
+            header={MappingTypeLabel[MappingType.DashboardMapToExisting]}
+            key={MappingType.DashboardMapToExisting}
+          >
             {noExisting ?
               <Tooltip title="There are currently no dashboard parameters">
                 <Icon
@@ -219,10 +208,6 @@ class SourceInput extends React.Component {
                 value={mapTo}
                 onChange={this.onChangeMapToParam}
                 size="small"
-                style={{
-                  opacity: type === MappingType.DashboardMapToExisting ? 1 : 0,
-                  pointerEvents: type === MappingType.DashboardMapToExisting ? null : 'none',
-                }}
                 dropdownMatchSelectWidth={false}
               >
                 {existing.map(prm => (
@@ -230,34 +215,30 @@ class SourceInput extends React.Component {
                 ))}
               </Select>
             }
-          </Radio>
-          <Radio {...radioStyle} value={ParameterMappingType.WidgetLevel} key={2}>
-            Widget parameter
-          </Radio>
-          <Radio {...radioStyle} value={ParameterMappingType.StaticValue} key={3}>
-            Static value
-            <span style={{
-              marginLeft: 4,
-              opacity: type === MappingType.StaticValue ? 1 : 0,
-              pointerEvents: type === MappingType.StaticValue ? null : 'none',
-            }}
-            >
-              <ParameterValueInput
-                className="static-value-input"
-                size="small"
-                type={param.type}
-                value={value || param.normalizedValue}
-                enumOptions={param.enumOptions}
-                queryId={param.queryId}
-                onSelect={this.onChangeStaticValue}
-                clientConfig={this.props.clientConfig}
-                Query={this.props.Query}
-              />
-            </span>
-          </Radio>
-        </Radio.Group>
+          </RadioPanel>
+          <RadioPanel
+            header={MappingTypeLabel[MappingType.WidgetLevel]}
+            key={MappingType.WidgetLevel}
+          />
+          <RadioPanel
+            header={MappingTypeLabel[MappingType.StaticValue]}
+            key={MappingType.StaticValue}
+          >
+            <ParameterValueInput
+              className="static-value-input"
+              size="small"
+              type={param.type}
+              value={value || param.normalizedValue}
+              enumOptions={param.enumOptions}
+              queryId={param.queryId}
+              onSelect={this.onChangeStaticValue}
+              clientConfig={this.props.clientConfig}
+              Query={this.props.Query}
+            />
+          </RadioPanel>
+        </Collapse>
         <footer style={{
-         marginTop: 10, paddingTop: 10, borderTop: '1px solid #eee', textAlign: 'right',
+         marginTop: 10, paddingTop: 10, borderTop: '1px solid #eee', textAlign: 'right', position: 'absolute', left: 0, right: 0, bottom: 0,
         }}
         >
           <Button size="small" onClick={this.cancel} style={{ marginRight: 2 }}>
@@ -265,7 +246,7 @@ class SourceInput extends React.Component {
           </Button>
           <Button size="small" type="primary" onClick={this.save} disabled={!fulfilled}>OK</Button>
         </footer>
-      </Fragment>
+      </div>
     );
   }
 
@@ -439,8 +420,6 @@ export class ParameterMappingListInput extends React.Component {
     const Query = this.props.Query; // eslint-disable-line react/prop-types
 
     const data = this.props.mappings.map(mapping => ({ mapping }));
-
-    console.log(data);
 
     return (
       <div ref={this.wrapperRef}>
