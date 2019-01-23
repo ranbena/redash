@@ -12,6 +12,7 @@ import Input from 'antd/lib/input';
 import Radio from 'antd/lib/radio';
 import Tooltip from 'antd/lib/tooltip';
 import Collapse from 'antd/lib/collapse';
+import Form from 'antd/lib/form';
 import { ParameterValueInput } from '@/components/ParameterValueInput';
 import { ParameterMappingType } from '@/services/widget';
 
@@ -118,6 +119,7 @@ class SourceInput extends React.Component {
       editMode: false,
       originalMapTo: null,
       mapping: clone(this.props.mapping),
+      error: null,
     };
   }
 
@@ -134,16 +136,32 @@ class SourceInput extends React.Component {
   }
 
   onChangeAddNewName = (e) => {
-    this.mapping = { mapTo: e.target.value };
+    const mapTo = e.target.value;
+    if (!mapTo) {
+      this.setState({ error: 'Please provide paramater name' });
+    } else if (includes(this.props.existingParamNames, mapTo)) {
+      this.setState({ error: 'This parameter name already exists' });
+    } else {
+      this.setState({ error: null });
+    }
+    this.mapping = { mapTo };
   }
 
   onChangeSourceType = (type) => {
-    let mapTo = this.state.originalMapTo;
-    if (type === MappingType.DashboardMapToExisting) {
-      const { existingParamNames } = this.props;
-      if (!includes(existingParamNames, mapTo)) {
-        mapTo = existingParamNames[0]; // select first, undefined also ok
-      }
+    this.setState({ error: null });
+    let mapTo = this.state.originalMapTo; // reset to original
+
+    // default to first select option
+    if (type === MappingType.DashboardMapToExisting && !includes(this.existingParams, mapTo)) {
+      mapTo = this.existingParams[0]; // undefined also ok
+    }
+
+    // reset static value
+    if (type === MappingType.StaticValue) {
+      const { param, value } = this.state.mapping;
+      this.onChangeStaticValue(value || param.normalizedValue);
+    } else {
+      this.mapping = { value: null };
     }
 
     this.mapping = { type, mapTo };
@@ -154,67 +172,38 @@ class SourceInput extends React.Component {
   }
 
   onChangeStaticValue = (value) => {
+    this.setState({ error: value ? null : 'Please provide a value' });
     this.mapping = { value };
   }
 
+  get existingParams() {
+    const ret = this.props.existingParamNames;
+    Object.defineProperty(this, 'existingParams', { value: ret }); // memoize
+    return ret;
+  }
+
   get popover() {
-    const { existingParamNames: existing } = this.props;
-    const {
-      type, mapTo, value, param,
-    } = this.state.mapping;
-
-    const alreadyExists = includes(existing, mapTo);
-    const noExisting = isEmpty(existing);
-
-    let fulfilled = true;
-    if (
-      type === MappingType.DashboardMapToExisting && noExisting ||
-      type === MappingType.DashboardAddNew && (alreadyExists || isEmpty(mapTo))
-    ) {
-      fulfilled = false;
-    }
+    const { error, mapping } = this.state;
 
     return (
-      <div style={{ width: 300, height: 233, position: 'relative' }}>
-        <Collapse bordered={false} accordion onChange={this.onChangeSourceType} defaultActiveKey={type}>
+      <div style={{ width: 300, height: 278, position: 'relative' }}>
+        <Collapse
+          bordered={false}
+          accordion
+          onChange={this.onChangeSourceType}
+          defaultActiveKey={mapping.type}
+        >
           <RadioPanel
             header={MappingTypeLabel[MappingType.DashboardAddNew]}
             key={MappingType.DashboardAddNew}
           >
-            <Input
-              size="small"
-              value={mapTo}
-              onChange={this.onChangeAddNewName}
-            />
+            {this.renderNewDashboardContent()}
           </RadioPanel>
           <RadioPanel
             header={MappingTypeLabel[MappingType.DashboardMapToExisting]}
             key={MappingType.DashboardMapToExisting}
           >
-            {noExisting ?
-              <Tooltip title="There are currently no dashboard parameters">
-                <Icon
-                  type="exclamation-circle"
-                  style={{
-                    verticalAlign: 'text-bottom',
-                    position: 'relative',
-                    top: -1,
-                    color: type === MappingType.DashboardMapToExisting ? '#F44336' : '#d6d6d6',
-                  }}
-                />
-              </Tooltip> :
-              <Select
-                class="w-100"
-                value={mapTo}
-                onChange={this.onChangeMapToParam}
-                size="small"
-                dropdownMatchSelectWidth={false}
-              >
-                {existing.map(prm => (
-                  <Select.Option value={prm} key={prm}>{prm}</Select.Option>
-                ))}
-              </Select>
-            }
+            {this.renderExistingDashboardContent()}
           </RadioPanel>
           <RadioPanel
             header={MappingTypeLabel[MappingType.WidgetLevel]}
@@ -224,17 +213,7 @@ class SourceInput extends React.Component {
             header={MappingTypeLabel[MappingType.StaticValue]}
             key={MappingType.StaticValue}
           >
-            <ParameterValueInput
-              className="static-value-input"
-              size="small"
-              type={param.type}
-              value={value || param.normalizedValue}
-              enumOptions={param.enumOptions}
-              queryId={param.queryId}
-              onSelect={this.onChangeStaticValue}
-              clientConfig={this.props.clientConfig}
-              Query={this.props.Query}
-            />
+            {this.renderStaticValueContent()}
           </RadioPanel>
         </Collapse>
         <footer style={{
@@ -244,7 +223,7 @@ class SourceInput extends React.Component {
           <Button size="small" onClick={this.cancel} style={{ marginRight: 2 }}>
             Cancel
           </Button>
-          <Button size="small" type="primary" onClick={this.save} disabled={!fulfilled}>OK</Button>
+          <Button size="small" type="primary" onClick={this.save} disabled={!!error}>OK</Button>
         </footer>
       </div>
     );
@@ -267,7 +246,80 @@ class SourceInput extends React.Component {
   }
 
   hide = () => {
-    this.setState({ editMode: false });
+    this.setState({ editMode: false, error: null });
+  }
+
+  renderNewDashboardContent() {
+    const { error, mapping } = this.state;
+    return (
+      <Form.Item
+        hasFeedback
+        validateStatus={error ? 'error' : ''}
+        help={error || 'Fill in the new parameter name'}
+      >
+        <Input
+          size="small"
+          value={mapping.mapTo}
+          onChange={this.onChangeAddNewName}
+        />
+      </Form.Item>
+    );
+  }
+
+  renderExistingDashboardContent() {
+    const { type, mapTo } = this.state.mapping;
+
+    if (isEmpty(this.existingParams)) {
+      return (
+        <Tooltip title="There are currently no dashboard parameters">
+          <Icon
+            type="exclamation-circle"
+            style={{
+              verticalAlign: 'text-bottom',
+              position: 'relative',
+              top: -1,
+              color: type === MappingType.DashboardMapToExisting ? '#F44336' : '#d6d6d6',
+            }}
+          />
+        </Tooltip>
+      );
+    }
+
+    return (
+      <Select
+        value={mapTo}
+        onChange={this.onChangeMapToParam}
+        size="small"
+        dropdownMatchSelectWidth={false}
+      >
+        {this.existingParams.map(prm => (
+          <Select.Option value={prm} key={prm}>{prm}</Select.Option>
+        ))}
+      </Select>
+    );
+  }
+
+  renderStaticValueContent() {
+    const { error, mapping: { value, param } } = this.state;
+
+    return (
+      <Form.Item
+        hasFeedback
+        validateStatus={error ? 'error' : ''}
+        help={error || 'Fill in the static value'}
+      >
+        <ParameterValueInput
+          size="small"
+          type={param.type}
+          value={value}
+          enumOptions={param.enumOptions}
+          queryId={param.queryId}
+          onSelect={this.onChangeStaticValue}
+          clientConfig={this.props.clientConfig}
+          Query={this.props.Query}
+        />
+      </Form.Item>
+    );
   }
 
   render() {
@@ -297,6 +349,8 @@ class SourceInput extends React.Component {
     );
   }
 }
+
+// const SourceInputForm = Form.create({ name: 'SourceInputForm' })(SourceInput);
 
 class TitleInput extends React.Component {
   static propTypes = {
