@@ -17,17 +17,10 @@ import { ParameterValueInput } from '@/components/ParameterValueInput';
 import { ParameterMappingType } from '@/services/widget';
 
 export const MappingType = {
-  DashboardAddNew: 'dashboard-add-new',
-  DashboardMapToExisting: 'dashboard-map-to-existing',
-  WidgetLevel: 'widget-level',
-  StaticValue: 'static-value',
-};
-
-const MappingTypeLabel = {
-  [MappingType.DashboardAddNew]: 'New dashboard parameter',
-  [MappingType.DashboardMapToExisting]: 'Existing dashboard parameter',
-  [MappingType.WidgetLevel]: 'Widget parameter',
-  [MappingType.StaticValue]: 'Static value',
+  DashboardAddNew: 'New dashboard parameter',
+  DashboardMapToExisting: 'Existing dashboard parameter',
+  WidgetLevel: 'Widget parameter',
+  StaticValue: 'Static value',
 };
 
 export function parameterMappingsToEditableMappings(mappings, parameters, existingParameterNames = []) {
@@ -148,23 +141,29 @@ class SourceInput extends React.Component {
   }
 
   onChangeSourceType = (type) => {
+    // resets
     this.setState({ error: null });
-    let mapTo = this.state.originalMapTo; // reset to original
+    this.mapping = { value: null, mapTo: this.state.originalMapTo };
 
-    // default to first select option
-    if (type === MappingType.DashboardMapToExisting && !includes(this.existingParams, mapTo)) {
-      mapTo = this.existingParams[0]; // undefined also ok
+    // type: map to existing
+    if (type === MappingType.DashboardMapToExisting) {
+      const { mapTo } = this.state.mapping;
+
+      // if mapped name doesn't already exists
+      // default to first select option (undefined also ok)
+      if (!includes(this.existingParams, mapTo)) {
+        this.onChangeMapToParam(this.existingParams[0]);
+      }
     }
 
-    // reset static value
+    // type: static value
     if (type === MappingType.StaticValue) {
       const { param, value } = this.state.mapping;
-      this.onChangeStaticValue(value || param.normalizedValue);
-    } else {
-      this.mapping = { value: null };
+      this.onChangeStaticValue(value || param.normalizedValue); // set default
     }
 
-    this.mapping = { type, mapTo };
+    // set new type
+    this.mapping = { type };
   }
 
   onChangeMapToParam = (mapTo) => {
@@ -186,7 +185,7 @@ class SourceInput extends React.Component {
     const { error, mapping } = this.state;
 
     return (
-      <div style={{ width: 300, height: 278, position: 'relative' }}>
+      <div style={{ width: 320, height: 275, position: 'relative' }}>
         <Collapse
           bordered={false}
           accordion
@@ -194,23 +193,23 @@ class SourceInput extends React.Component {
           defaultActiveKey={mapping.type}
         >
           <RadioPanel
-            header={MappingTypeLabel[MappingType.DashboardAddNew]}
+            header={MappingType.DashboardAddNew}
             key={MappingType.DashboardAddNew}
           >
             {this.renderNewDashboardContent()}
           </RadioPanel>
           <RadioPanel
-            header={MappingTypeLabel[MappingType.DashboardMapToExisting]}
+            header={MappingType.DashboardMapToExisting}
             key={MappingType.DashboardMapToExisting}
           >
             {this.renderExistingDashboardContent()}
           </RadioPanel>
           <RadioPanel
-            header={MappingTypeLabel[MappingType.WidgetLevel]}
+            header={MappingType.WidgetLevel}
             key={MappingType.WidgetLevel}
           />
           <RadioPanel
-            header={MappingTypeLabel[MappingType.StaticValue]}
+            header={MappingType.StaticValue}
             key={MappingType.StaticValue}
           >
             {this.renderStaticValueContent()}
@@ -324,11 +323,15 @@ class SourceInput extends React.Component {
 
   render() {
     const { mapping, getContainerElement } = this.props;
+    const isDashboardType =
+      mapping.type === MappingType.DashboardAddNew ||
+      mapping.type === MappingType.DashboardMapToExisting;
+
     return (
       <span style={{ whiteSpace: 'nowrap' }}>
-        {MappingTypeLabel[mapping.type]}
+        {isDashboardType ? 'Dashboard parameter' : mapping.type}
         {' '}
-        {includes([MappingType.DashboardAddNew, MappingType.DashboardMapToExisting], mapping.type)
+        {isDashboardType
           ? <code className="ant-tag" style={{ margin: 0 }}>{mapping.mapTo}</code>
           : null
         }
